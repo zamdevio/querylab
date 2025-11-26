@@ -27,7 +27,7 @@ app.use('*', async (c, next) => {
 	let allowedOrigins: string[];
 	try {
 		config = getConfig(c.env);
-		allowedOrigins = getAllowedOrigins(config);
+		allowedOrigins = getAllowedOrigins(config, c.env);
 	} catch (err) {
 		// For health check, allow all origins if config fails
 		if (c.req.path === '/health') {
@@ -48,30 +48,44 @@ app.use('*', async (c, next) => {
 	const isAllowedOrigin = origin && (allowedOrigins.includes('*') || allowedOrigins.includes(origin));
 	
 	// Determine the CORS origin to use
-	// If request has an Origin header and it's allowed, use it exactly as sent
-	// Otherwise, use the first allowed origin (which should be the full FRONTEND_URL)
-	const corsOrigin = isAllowedOrigin && origin 
-		? origin 
-		: (allowedOrigins[0] === '*' ? '*' : allowedOrigins[0]);
+	// If requesting origin is in the allowed list, use it exactly as sent
+	// Otherwise, fall back to FRONTEND_URL (which should always be in the allowed list)
+	let corsOrigin: string;
+	if (isAllowedOrigin && origin) {
+		// Use the requesting domain if it's in the allowed list
+		corsOrigin = origin;
+	} else if (allowedOrigins.includes('*')) {
+		// Allow all origins (development/health check)
+		corsOrigin = '*';
+	} else {
+		// Fall back to FRONTEND_URL (first in allowed origins list, which should always contain FRONTEND_URL)
+		corsOrigin = allowedOrigins[0] || '';
+	}
 	
 	// Handle preflight OPTIONS request
 	if (c.req.method === 'OPTIONS') {
-		return new Response(null, {
-			status: 204,
-			headers: {
-				'Access-Control-Allow-Origin': corsOrigin,
-				'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-				'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
-				'Access-Control-Allow-Credentials': 'true',
-				'Access-Control-Max-Age': '86400',
-			},
-		});
+		// Always allow OPTIONS if origin is in allowed list or wildcard is enabled
+		if (isAllowedOrigin || allowedOrigins.includes('*') || !origin) {
+			return new Response(null, {
+				status: 204,
+				headers: {
+					'Access-Control-Allow-Origin': corsOrigin,
+					'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+					'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-user-id',
+					'Access-Control-Allow-Credentials': 'true',
+					'Access-Control-Max-Age': '86400',
+				},
+			});
+		}
+		// Reject preflight if origin is not allowed
+		return new Response(null, { status: 403 });
 	}
 	
 	// Add CORS headers to response
 	await next();
 	
-	if (isAllowedOrigin || allowedOrigins.includes('*')) {
+	// Set CORS headers if origin is allowed, or if no origin (same-origin), or wildcard enabled
+	if (isAllowedOrigin || allowedOrigins.includes('*') || !origin) {
 		c.header('Access-Control-Allow-Origin', corsOrigin);
 		c.header('Access-Control-Allow-Credentials', 'true');
 		c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

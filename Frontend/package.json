@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "npx serve@latest out",
     "lint": "eslint",
-    "cf:deploy": "npm run build && wrangler pages deploy out --project-name querylab"
+    "cf:deploy": "npm run build && wrangler pages deploy out --project-name querylab --branch=querylab"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.14",

@@ -451,7 +451,7 @@ export async function importSqlFile(
 				tables.push(statement);
 			} else if (trimmed.startsWith('INSERT INTO')) {
 				inserts.push(statement);
-			} else if (trimmed.startsWith('SELECT SETVAL')) {
+			} else if (trimmed.startsWith('SELECT SETVAL') || trimmed.startsWith('SELECT SET_VAL')) {
 				// Sequence setval commands should come after sequences are created
 				sequences.push(statement);
 			} else if (trimmed) {
@@ -459,29 +459,150 @@ export async function importSqlFile(
 			}
 		}
 		
-		// Execute in order: sequences first, then tables, then inserts, then others
-		const orderedStatements = [...sequences, ...tables, ...inserts, ...others];
-		
-		for (const statement of orderedStatements) {
+		// Execute sequences first (required before tables that reference them)
+		// Ensure sequences are created and committed before tables reference them
+		for (const statement of sequences) {
 			if (statement.trim()) {
 				const pgSql = convertSqliteToPostgres(statement);
 				try {
-					// Use exec for DDL/DML, query for SELECT
+					if (pgSql.trim().toUpperCase().startsWith('SELECT')) {
+						// SELECT SETVAL - execute but don't fail if it errors
+						try {
+							await db.query(pgSql);
+						} catch (queryErr) {
+							// Ignore setval errors - sequence might already be set correctly
+							console.warn('Setval query failed (non-critical):', queryErr);
+						}
+					} else {
+						// CREATE SEQUENCE - use exec() and ensure it completes
+						// Remove IF NOT EXISTS temporarily to ensure it's created
+						const createSeqSql = pgSql.replace(/IF NOT EXISTS /gi, '');
+						await db.exec(createSeqSql);
+					}
+				} catch (err) {
+					// If it's a sequence that already exists, continue
+					const errorMsg = err instanceof Error ? err.message : String(err);
+					if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
+						continue; // Skip if sequence already exists
+					}
+					// Try with IF NOT EXISTS if direct creation failed
+					try {
+						const withIfNotExists = pgSql.includes('IF NOT EXISTS') ? pgSql : pgSql.replace(/CREATE SEQUENCE /i, 'CREATE SEQUENCE IF NOT EXISTS ');
+						await db.exec(withIfNotExists);
+					} catch {
+						throw err; // Re-throw original error if both attempts fail
+					}
+				}
+			}
+		}
+		
+		// Small delay to ensure all sequences are committed and visible
+		if (sequences.length > 0) {
+			await new Promise(resolve => setTimeout(resolve, 50));
+		}
+		
+		// Then execute tables (sequences are now available)
+		// If table creation fails due to missing sequence, provide helpful error
+		for (const statement of tables) {
+			if (statement.trim()) {
+				const pgSql = convertSqliteToPostgres(statement);
+				try {
+					await db.exec(pgSql);
+				} catch (err) {
+					const errorMsg = err instanceof Error ? err.message : String(err);
+					// If table already exists, skip it
+					if (errorMsg.includes('already exists')) {
+						continue;
+					}
+					// If sequence doesn't exist, try to find and create missing sequences
+					if (errorMsg.includes('does not exist') && (errorMsg.includes('seq') || errorMsg.includes('sequence'))) {
+						// Extract sequence name from error message
+						// Error format: "relation \"categories_category_id_seq\" does not exist"
+						// Try multiple patterns to match sequence names
+						const seqMatch = errorMsg.match(/"([^"]*_seq)"/) 
+							|| errorMsg.match(/'([^']*_seq)'/)
+							|| errorMsg.match(/(\w+_\w+_\w+_seq)/)
+							|| errorMsg.match(/(\w+_\w+_seq)/)
+							|| errorMsg.match(/(\w+_seq)/);
+						
+						if (seqMatch && seqMatch[1]) {
+							const seqName = seqMatch[1];
+							try {
+								// Try to create the missing sequence - try both with and without schema
+								try {
+									await db.exec(`CREATE SEQUENCE IF NOT EXISTS public.${seqName} START 1 INCREMENT 1;`);
+								} catch {
+									// If public schema fails, try without schema
+									await db.exec(`CREATE SEQUENCE IF NOT EXISTS ${seqName} START 1 INCREMENT 1;`);
+								}
+								
+								// Small delay to ensure sequence is visible
+								await new Promise(resolve => setTimeout(resolve, 50));
+								
+								// Retry table creation
+								await db.exec(pgSql);
+								continue; // Success after creating sequence
+							} catch {
+								// If retry fails, try to extract sequence name from the CREATE TABLE statement itself
+								// Look for nextval('sequence_name') pattern in the SQL
+								const nextvalMatch = pgSql.match(/nextval\(['"]([^'"]*_seq)['"]/i);
+								if (nextvalMatch && nextvalMatch[1]) {
+									const seqFromSql = nextvalMatch[1];
+									try {
+										await db.exec(`CREATE SEQUENCE IF NOT EXISTS ${seqFromSql} START 1 INCREMENT 1;`);
+										await new Promise(resolve => setTimeout(resolve, 50));
+										await db.exec(pgSql);
+										continue;
+									} catch {
+										// If all retries fail, throw original error
+										throw err;
+									}
+								}
+								// If we can't find sequence name, throw original error
+								throw err;
+							}
+						}
+					}
+					throw err; // Re-throw other errors
+				}
+			}
+		}
+		
+		// Then execute inserts
+		for (const statement of inserts) {
+			if (statement.trim()) {
+				const pgSql = convertSqliteToPostgres(statement);
+				try {
+					await db.exec(pgSql);
+				} catch (err) {
+					// Log insert errors but continue - some inserts might fail due to constraints
+					const errorMsg = err instanceof Error ? err.message : String(err);
+					console.warn(`Insert statement failed: ${errorMsg.substring(0, 100)}`);
+				}
+			}
+		}
+		
+		// Finally execute other statements
+		for (const statement of others) {
+			if (statement.trim()) {
+				const pgSql = convertSqliteToPostgres(statement);
+				try {
 					if (pgSql.trim().toUpperCase().startsWith('SELECT')) {
 						await db.query(pgSql);
 					} else {
 						await db.exec(pgSql);
 					}
 				} catch (err) {
-					// If it's a sequence that already exists, continue
 					const errorMsg = err instanceof Error ? err.message : String(err);
-					if (errorMsg.includes('already exists') && statement.trim().toUpperCase().includes('SEQUENCE')) {
-						continue; // Skip if sequence already exists
+					// Skip "already exists" errors for other statements too
+					if (errorMsg.includes('already exists')) {
+						continue;
 					}
 					throw err; // Re-throw other errors
 				}
 			}
 		}
+		
 		return { ok: true };
 	} catch (err) {
 		const error = err instanceof Error ? err : new Error(String(err));

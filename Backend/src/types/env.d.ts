@@ -26,6 +26,7 @@ declare global {
 		// Optional configuration: Can be secret, vars, or .dev.vars
 		FRONTEND_URL?: string;
 		COOKIE_DOMAIN?: string;
+		ALLOWED_ORIGINS?: string; // Comma-separated list of allowed origins for CORS
 		
 		// Durable Object binding (auto-provided by Cloudflare)
 		STORAGE_DO: DurableObjectNamespace;

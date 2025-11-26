@@ -62,11 +62,18 @@ interface TableInfo {
 export default function HomePage() {
 	const [db, setDb] = useState<Database | null>(null);
 	const [currentDbKey, setCurrentDbKey] = useState<string>('');
-	const [sql, setSql] = useState('SELECT * FROM students LIMIT 10;');
+	const [sql, setSql] = useState(
+		`-- You can use AI to generate SQL for you (look for the "Ask AI" button).
+-- The database schema is shown in the panel to the left (or below on mobile).
+-- Your SQL query here...`
+	);
 	const [results, setResults] = useState<unknown[]>([]);
 	const [columns, setColumns] = useState<string[]>([]);
 	const [tables, setTables] = useState<TableInfo[]>([]);
+	const [schemaLoading, setSchemaLoading] = useState(false); // Loading state for schema updates
 	const [loading, setLoading] = useState(true);
+	const [isInitializing, setIsInitializing] = useState(false); // First-time DB initialization
+	const [initProgress, setInitProgress] = useState({ current: 0, total: 0, message: '' }); // Progress tracking
 	const [executing, setExecuting] = useState(false);
 	const [aiLoading, setAiLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -124,29 +131,54 @@ export default function HomePage() {
 	// Load prepared database from public/db folder
 	const loadPreparedDatabase = useCallback(async (filename: string, name: string): Promise<{ db: Database; key: string } | null> => {
 		try {
+			// Fetch SQL file
 			const response = await fetch(`/db/${filename}`);
 			if (!response.ok) {
-				console.warn(`Failed to load prepared database: ${filename}`);
+				toast.error(`Failed to load prepared database: ${filename}`);
 				return null;
 			}
 			const sqlContent = await response.text();
 			
-			// Create new database with the SQL content
-			const { db, key } = await createNamedDb(name);
-			const importResult = await importSqlFile(db, sqlContent);
-			
-			if (!importResult.ok) {
-				await deleteDatabase(key);
-				console.error(`Failed to import prepared database ${filename}:`, importResult.error);
+			if (!sqlContent.trim()) {
+				toast.error(`Empty SQL file: ${filename}`);
 				return null;
 			}
 			
-			// Explicitly save to storage to ensure persistence
+			// Create new database with proper name based on filename
+			// This creates an empty database first
+			const { db, key } = await createNamedDb(name);
+			
+			// Wait for database to be ready
+			await db.waitReady;
+			
+			// Execute SQL using importSqlFile - properly handles long SQL files
+			// It splits statements, orders them (sequences, tables, inserts), converts SQLite syntax
+			const importResult = await importSqlFile(db, sqlContent);
+			
+			if (!importResult.ok) {
+				// If import fails, clean up the database
+				await deleteDatabase(key);
+				toast.error(`Failed to import SQL for ${name}: ${importResult.error}`);
+				return null;
+			}
+			
+			// Save database to storage after successful SQL execution (like editor does)
 			await saveDbToStorage(key, db);
+			
+			// Verify database has tables (basic check that SQL executed correctly)
+			try {
+				const tables = await listTables(db);
+				if (tables.length === 0) {
+					toast.warning(`${name} was created but has no tables - SQL may not have executed correctly`);
+				}
+			} catch {
+				toast.warning(`Could not verify tables in ${name}`);
+			}
 			
 			return { db, key };
 		} catch (err) {
-			console.error(`Error loading prepared database ${filename}:`, err);
+			const errorMsg = err instanceof Error ? err.message : String(err);
+			toast.error(`Error loading ${name}: ${errorMsg}`);
 			return null;
 		}
 	}, []);
@@ -162,31 +194,58 @@ export default function HomePage() {
 				
 				// If no databases exist, auto-install both prepared databases
 				if (existingDbs.length === 0) {
-					// Load both prepared databases in parallel for better performance
-					const [ecommerceDb, universityDb] = await Promise.allSettled([
+					setLoading(false); // Hide main loader, show init loader instead
+					setIsInitializing(true);
+					setInitProgress({ current: 0, total: 2, message: 'Starting database setup...' });
+					
+					// Load both prepared databases sequentially with progress updates
+					setInitProgress({ current: 0, total: 2, message: 'Installing E-Commerce Database...' });
+					const ecommerceDbResult = await Promise.allSettled([
 						loadPreparedDatabase('ecommerce.sql', 'E-Commerce Database'),
+					]);
+					const ecommerce = ecommerceDbResult[0].status === 'fulfilled' ? ecommerceDbResult[0].value : null;
+					
+					setInitProgress({ current: 1, total: 2, message: 'Installing University Database...' });
+					const universityDbResult = await Promise.allSettled([
 						loadPreparedDatabase('university.sql', 'University Database'),
 					]);
+					const university = universityDbResult[0].status === 'fulfilled' ? universityDbResult[0].value : null;
 					
-					// Extract successful results
-					const ecommerce = ecommerceDb.status === 'fulfilled' ? ecommerceDb.value : null;
-					const university = universityDb.status === 'fulfilled' ? universityDb.value : null;
+					setInitProgress({ current: 2, total: 2, message: 'Finalizing setup...' });
 					
-					// Use E-Commerce as default if available, otherwise University
-					if (ecommerce) {
+					// Always set both databases - use E-Commerce as default if available
+					if (ecommerce && university) {
+						// Both loaded successfully - set E-Commerce as active, but both are available
 						setDb(ecommerce.db);
 						setCurrentDbKey(ecommerce.key);
 						await updateSchema(ecommerce.db);
 						await loadSuggestions(ecommerce.db);
+						toast.success('Both databases installed! Using E-Commerce Database.');
+					} else if (ecommerce) {
+						setDb(ecommerce.db);
+						setCurrentDbKey(ecommerce.key);
+						await updateSchema(ecommerce.db);
+						await loadSuggestions(ecommerce.db);
+						toast.success('E-Commerce Database installed and ready!');
+						if (!university) {
+							toast.warning('University Database installation failed');
+						}
 					} else if (university) {
 						setDb(university.db);
 						setCurrentDbKey(university.key);
 						await updateSchema(university.db);
 						await loadSuggestions(university.db);
+						toast.success('University Database installed and ready!');
+						toast.warning('E-Commerce Database installation failed');
 					} else {
 						// Both failed to load - show error but don't create empty database
-						setError('Failed to load prepared databases. Please refresh the page or try importing a database manually.');
+						const errorMsg = 'Failed to load prepared databases. Please refresh the page or try importing a database manually.';
+						setError(errorMsg);
+						toast.error(errorMsg);
 					}
+					
+					setIsInitializing(false);
+					setLoading(false); // Ensure loading is false after initialization
 				} else {
 					// Load the first available database (most recent)
 					const firstDb = await loadDbFromStorage(existingDbs[0].key);
@@ -196,32 +255,65 @@ export default function HomePage() {
 						await updateSchema(firstDb);
 						await loadSuggestions(firstDb);
 					} else {
-						// If first DB failed to load, try to install prepared databases
-						const [ecommerceDb, universityDb] = await Promise.allSettled([
+						// If first DB failed to load, try to install both prepared databases
+						setLoading(false); // Hide main loader, show init loader instead
+						setIsInitializing(true);
+						toast.warning('Failed to load existing database. Installing sample databases...');
+						
+						setInitProgress({ current: 0, total: 2, message: 'Installing E-Commerce Database...' });
+						const ecommerceDbResult = await Promise.allSettled([
 							loadPreparedDatabase('ecommerce.sql', 'E-Commerce Database'),
+						]);
+						const ecommerce = ecommerceDbResult[0].status === 'fulfilled' ? ecommerceDbResult[0].value : null;
+						
+						setInitProgress({ current: 1, total: 2, message: 'Installing University Database...' });
+						const universityDbResult = await Promise.allSettled([
 							loadPreparedDatabase('university.sql', 'University Database'),
 						]);
+						const university = universityDbResult[0].status === 'fulfilled' ? universityDbResult[0].value : null;
 						
-						const ecommerce = ecommerceDb.status === 'fulfilled' ? ecommerceDb.value : null;
-						const university = universityDb.status === 'fulfilled' ? universityDb.value : null;
+						setInitProgress({ current: 2, total: 2, message: 'Finalizing setup...' });
 						
-						if (ecommerce) {
+						// Set both databases - use E-Commerce as default if available
+						if (ecommerce && university) {
 							setDb(ecommerce.db);
 							setCurrentDbKey(ecommerce.key);
 							await updateSchema(ecommerce.db);
 							await loadSuggestions(ecommerce.db);
+							toast.success('Both databases installed! Using E-Commerce Database.');
+						} else if (ecommerce) {
+							setDb(ecommerce.db);
+							setCurrentDbKey(ecommerce.key);
+							await updateSchema(ecommerce.db);
+							await loadSuggestions(ecommerce.db);
+							toast.success('E-Commerce Database installed and ready!');
+							if (!university) {
+								toast.warning('University Database installation failed');
+							}
 						} else if (university) {
 							setDb(university.db);
 							setCurrentDbKey(university.key);
 							await updateSchema(university.db);
 							await loadSuggestions(university.db);
+							toast.success('University Database installed and ready!');
+							toast.warning('E-Commerce Database installation failed');
+						} else {
+							toast.error('Failed to load databases. Please try importing a database manually.');
 						}
+						
+						setIsInitializing(false);
+						setLoading(false); // Ensure loading is false after initialization
 					}
 				}
 			} catch (err) {
-				setError(err instanceof Error ? err.message : 'Failed to initialize database');
+				const errorMsg = err instanceof Error ? err.message : 'Failed to initialize database';
+				setError(errorMsg);
+				toast.error(errorMsg);
+				setIsInitializing(false);
 			} finally {
-				setLoading(false);
+				if (!isInitializing) {
+					setLoading(false);
+				}
 			}
 		}
 		init();
@@ -285,8 +377,14 @@ export default function HomePage() {
 	const updateSchema = useCallback(async (database: Database | null) => {
 		try {
 			if (!database || !database.waitReady) {
+				setTables([]);
+				setSchemaLoading(false);
 				return;
 			}
+			
+			// Set loading state and clear previous tables immediately
+			setSchemaLoading(true);
+			setTables([]); // Clear immediately for better UX
 			
 			await database.waitReady;
 			const tableNames = await listTables(database);
@@ -325,8 +423,10 @@ export default function HomePage() {
 			}
 			
 			setTables(tableInfos);
+			setSchemaLoading(false);
 		} catch {
 			setTables([]);
+			setSchemaLoading(false);
 		}
 	}, []);
 
@@ -373,6 +473,9 @@ export default function HomePage() {
 				setExecuting(true);
 				const dbName = specialCommand.databaseName || 'New Database';
 				const { db: newDb, key: newKey } = await createNamedDb(dbName);
+				// Clear tables immediately for better UX
+				setTables([]);
+				setSchemaLoading(true);
 				setDb(newDb);
 				setCurrentDbKey(newKey);
 				await updateSchema(newDb);
@@ -415,6 +518,9 @@ export default function HomePage() {
 					return;
 				}
 				
+				// Clear tables immediately for better UX
+				setTables([]);
+				setSchemaLoading(true);
 				setDb(loadedDb);
 				setCurrentDbKey(targetDb.key);
 				await updateSchema(loadedDb);
@@ -883,6 +989,74 @@ export default function HomePage() {
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [db, currentDbKey]);
 
+	// Show init loader if initializing (even if main loading is false)
+	if (isInitializing) {
+			const progressPercent = initProgress.total > 0 ? (initProgress.current / initProgress.total) * 100 : 0;
+			const circumference = 2 * Math.PI * 36; // radius = 36 (72/2)
+			const offset = circumference - (progressPercent / 100) * circumference;
+			
+			return (
+				<div className="flex items-center justify-center min-h-screen bg-background">
+					<div className="text-center space-y-6 max-w-md px-4">
+						<div className="relative w-20 h-20 mx-auto">
+							{/* Background circle */}
+							<svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 80 80">
+								<circle
+									cx="40"
+									cy="40"
+									r="36"
+									stroke="currentColor"
+									strokeWidth="8"
+									fill="none"
+									className="text-primary/20"
+								/>
+								{/* Progress circle */}
+								<circle
+									cx="40"
+									cy="40"
+									r="36"
+									stroke="currentColor"
+									strokeWidth="8"
+									fill="none"
+									strokeDasharray={circumference}
+									strokeDashoffset={offset}
+									strokeLinecap="round"
+									className="text-primary transition-all duration-300 ease-out"
+								/>
+							</svg>
+							{/* Percentage text */}
+							<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary font-semibold text-sm">
+								{Math.round(progressPercent)}%
+							</div>
+						</div>
+						
+						<div className="space-y-2">
+							<p className="text-xl font-bold text-foreground">Welcome to QueryLab!</p>
+							<p className="text-base text-muted-foreground">{initProgress.message || 'Setting up your learning environment...'}</p>
+						</div>
+						
+						{/* Progress bar */}
+						<div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+							<div 
+								className="bg-primary h-full transition-all duration-300 ease-out rounded-full"
+								style={{ width: `${progressPercent}%` }}
+							></div>
+						</div>
+						
+						{/* Step indicators */}
+						<div className="flex items-center justify-center gap-3 pt-2">
+							<div className={`w-2 h-2 rounded-full transition-all ${initProgress.current >= 1 ? 'bg-primary' : 'bg-muted'}`}></div>
+							<div className={`w-8 h-0.5 transition-all ${initProgress.current >= 1 ? 'bg-primary' : 'bg-muted'}`}></div>
+							<div className={`w-2 h-2 rounded-full transition-all ${initProgress.current >= 2 ? 'bg-primary' : 'bg-muted'}`}></div>
+						</div>
+						
+						<p className="text-xs text-muted-foreground pt-2">This only happens once. We&apos;re preparing sample databases for you!</p>
+					</div>
+			</div>
+		);
+	}
+	
+	// Normal loading (simple spinner) - only show if not initializing
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center min-h-screen bg-background">
@@ -890,7 +1064,7 @@ export default function HomePage() {
 					<div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
 					<div className="space-y-2">
 						<p className="text-lg font-semibold text-foreground">Loading QueryLab</p>
-						<p className="text-sm text-muted-foreground">Initializing database and loading suggestions...</p>
+						<p className="text-sm text-muted-foreground">Loading database...</p>
 					</div>
 					<div className="flex items-center justify-center gap-2 mt-4">
 						<div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
@@ -942,6 +1116,9 @@ export default function HomePage() {
 					<DatabaseSelector
 						currentDbKey={currentDbKey}
 						onDatabaseChange={async (newDb, key) => {
+							// Clear tables immediately for better UX
+							setTables([]);
+							setSchemaLoading(true);
 							setDb(newDb);
 							setCurrentDbKey(key);
 							// Clear old results and errors
@@ -1108,6 +1285,7 @@ export default function HomePage() {
 					<div className="lg:col-span-1">
 					<SchemaExplorer
 						tables={tables}
+						loading={schemaLoading}
 					/>
 					</div>
 				</div>

@@ -41,6 +41,7 @@
 	 * wrangler secret put RESEND_API_KEY
 	 * wrangler secret put EMAIL_FROM
 	 * wrangler secret put FRONTEND_URL  (required in production)
+	 * wrangler secret put ALLOWED_ORIGINS  (optional, comma-separated list of allowed origins for CORS)
 	 * wrangler secret put COOKIE_DOMAIN  (required in production)
 	 * 
 	 * For production, update ENVIRONMENT to "production"

@@ -16,10 +16,11 @@ interface TableInfo {
 
 interface SchemaExplorerProps {
 	tables: TableInfo[];
+	loading?: boolean;
 	onTableSelect?: (tableName: string) => void;
 }
 
-export function SchemaExplorer({ tables, onTableSelect }: SchemaExplorerProps) {
+export function SchemaExplorer({ tables, loading = false, onTableSelect }: SchemaExplorerProps) {
 	const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
 
 	const toggleTable = (tableName: string) => {
@@ -32,10 +33,32 @@ export function SchemaExplorer({ tables, onTableSelect }: SchemaExplorerProps) {
 		setExpandedTables(newExpanded);
 	};
 
+	// Show loading skeleton
+	if (loading) {
+		return (
+			<div className="space-y-2">
+				<h3 className="text-sm font-semibold text-foreground mb-3">Database Schema</h3>
+				<div className="max-h-96 overflow-y-auto space-y-2 pr-2">
+					{[1, 2, 3, 5, 6, 7, 8, 9, 10].map((i) => (
+						<div key={i} className="border border-border rounded-lg overflow-hidden animate-pulse">
+							<div className="w-full px-3 py-2 flex items-center justify-between">
+								<div className="h-4 bg-muted rounded w-32"></div>
+								<div className="w-4 h-4 bg-muted rounded"></div>
+							</div>
+						</div>
+					))}
+				</div>
+			</div>
+		);
+	}
+
 	if (tables.length === 0) {
 		return (
-			<div className="text-center py-8 text-muted-foreground text-sm">
-				No tables found
+			<div className="space-y-2">
+				<h3 className="text-sm font-semibold text-foreground mb-3">Database Schema</h3>
+				<div className="text-center py-8 text-muted-foreground text-sm">
+					No tables found
+				</div>
 			</div>
 		);
 	}

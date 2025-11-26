@@ -61,14 +61,16 @@ export function MobileHeader({ onLogin }: MobileHeaderProps) {
 
 	return (
 		<header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-			<div className="container flex h-14 items-center justify-between px-4">
+			<div className="container flex h-14 items-center justify-between px-4 relative">
+				{/* Left side: QueryLab Logo */}
 				<Link href="/" className="flex items-center gap-2">
 					<h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent hover:opacity-80 transition-opacity">
 						QueryLab
 					</h1>
 				</Link>
 				
-				<div className="flex items-center gap-2 ml-auto">
+				{/* Right side: Profile, Theme, GitHub, and Docs - always on the right for all screen sizes */}
+				<div className="flex items-center gap-2">
 					{/* Documentation Link */}
 					<Link
 						href="/docs"
@@ -80,6 +82,7 @@ export function MobileHeader({ onLogin }: MobileHeaderProps) {
 							Docs
 						</span>
 					</Link>
+					
 					{/* GitHub Link - Icon only on small screens, text + icon on larger */}
 					<a
 						href="https://github.com/zamdevio/querylab"
@@ -93,6 +96,7 @@ export function MobileHeader({ onLogin }: MobileHeaderProps) {
 							GitHub
 						</span>
 					</a>
+					
 					{/* Theme Toggle with Animation */}
 					<button
 						onClick={toggleTheme}
@@ -142,7 +146,7 @@ export function MobileHeader({ onLogin }: MobileHeaderProps) {
 							</svg>
 						</div>
 					</button>
-
+					
 					{/* User Profile Dropdown */}
 					{!loading && (
 						<UserProfileDropdown
@@ -156,4 +160,3 @@ export function MobileHeader({ onLogin }: MobileHeaderProps) {
 		</header>
 	);
 }
-

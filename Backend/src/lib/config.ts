@@ -26,6 +26,13 @@ export interface Config {
 	frontendUrl: string;
 	
 	/**
+	 * Allowed origins for CORS
+	 * Can be set via Wrangler secret, .dev.vars, or wrangler.jsonc vars
+	 * Comma-separated list of allowed origins for CORS
+	 */
+	allowedOrigins?: string;
+	
+	/**
 	 * Cookie domain
 	 * Required in production when using cross-origin cookies (secure=true, sameSite=None)
 	 * Can be set via Wrangler secret, .dev.vars, or wrangler.jsonc vars
@@ -123,6 +130,7 @@ export function getConfig(env: Env): Config {
 	return {
 		env: envValue,
 		frontendUrl,
+		allowedOrigins: env.ALLOWED_ORIGINS,
 		cookieDomain,
 		deepseekKey: env.DEEPSEEK_KEY,
 		jwtSecret: env.JWT_SECRET,
@@ -134,12 +142,38 @@ export function getConfig(env: Env): Config {
 
 /**
  * Get allowed origins for CORS
+ * Supports multiple origins via ALLOWED_ORIGINS environment variable (comma-separated)
+ * Falls back to FRONTEND_URL if ALLOWED_ORIGINS is not set
  */
-export function getAllowedOrigins(config: Config): string[] {
+export function getAllowedOrigins(config: Config, env?: Env): string[] {
 	if (config.env === 'development') {
 		return ['http://localhost:3000', 'http://127.0.0.1:3000'];
 	}
 	
+	// Check for ALLOWED_ORIGINS environment variable (comma-separated list)
+	if (env?.ALLOWED_ORIGINS) {
+		const origins = env.ALLOWED_ORIGINS.split(',')
+			.map(origin => origin.trim())
+			.filter(origin => origin.length > 0)
+			.map(origin => {
+				// Normalize origin: ensure it has a protocol
+				if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
+					// Assume https:// for production origins
+					return `https://${origin}`;
+				}
+				return origin;
+			});
+		
+		if (origins.length > 0) {
+			// Always include the primary frontendUrl if not already in the list
+			if (!origins.includes(config.frontendUrl)) {
+				return [config.frontendUrl, ...origins];
+			}
+			return origins;
+		}
+	}
+	
+	// Fall back to single FRONTEND_URL
 	return [config.frontendUrl];
 }
 
