@@ -1,6 +1,20 @@
 # QueryLab
 
-> Zero-install, in-browser PostgreSQL learning app with AI assistance
+<div align="center">
+
+**A zero-install, in-browser PostgreSQL learning platform with AI-powered SQL assistance**
+
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![PGlite](https://img.shields.io/badge/PGlite-PostgreSQL%20WASM-38bdf8?style=for-the-badge)](https://github.com/electric-sql/pglite)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-Edge-orange?style=for-the-badge&logo=cloudflare)](https://workers.cloudflare.com/)
+[![Hono](https://img.shields.io/badge/Hono-Framework-00d4aa?style=for-the-badge)](https://hono.dev/)
+
+**[🌐 Live Demo](#)** • **[📖 Documentation](#-documentation)** • **[🚀 Getting Started](#-quick-start)**
+
+</div>
+
+---
 
 QueryLab is a full-stack application for learning SQL in your browser. It features a Monaco editor, client-side PostgreSQL execution powered by PGlite (the best engine matching standard SQL format), AI-powered SQL generation, and a beautiful mobile-first UI.
 
@@ -140,7 +154,7 @@ See [Backend/README.md](Backend/README.md) and [Frontend/README.md](Frontend/REA
 
 ## 📝 License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🤝 Contributing
 
