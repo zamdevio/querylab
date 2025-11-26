@@ -1,6 +1,6 @@
-# QueryLab
-
 <div align="center">
+
+# QueryLab
 
 **A zero-install, in-browser PostgreSQL learning platform with AI-powered SQL assistance**
 
@@ -159,4 +159,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🤝 Contributing
 
 Contributions welcome! Please open an issue or submit a PR.
+
 
