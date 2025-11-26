@@ -113,6 +113,7 @@ export default function HomePage() {
 	const [pendingEmail, setPendingEmail] = useState<string>('');
 	const [showAuthError, setShowAuthError] = useState(false);
 	const [authError, setAuthError] = useState<{ code?: string; message?: string } | null>(null);
+	const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
 	// Listen for open-login event from CodeVerificationModal
 	useEffect(() => {
@@ -989,6 +990,25 @@ export default function HomePage() {
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [db, currentDbKey]);
 
+	// Rotate loading messages
+	useEffect(() => {
+		if (!loading) return;
+		
+		const messages = [
+			'Connecting to your database...',
+			'Loading schema information...',
+			'Preparing query engine...',
+			'Setting up workspace...',
+			'Almost ready...',
+		];
+		
+		const interval = setInterval(() => {
+			setLoadingMessageIndex((prev) => (prev + 1) % messages.length);
+		}, 1500);
+		
+		return () => clearInterval(interval);
+	}, [loading]);
+
 	// Show init loader if initializing (even if main loading is false)
 	if (isInitializing) {
 			const progressPercent = initProgress.total > 0 ? (initProgress.current / initProgress.total) * 100 : 0;
@@ -1058,18 +1078,39 @@ export default function HomePage() {
 	
 	// Normal loading (simple spinner) - only show if not initializing
 	if (loading) {
+		const messages = [
+			'Connecting to your database...',
+			'Loading schema information...',
+			'Preparing query engine...',
+			'Setting up workspace...',
+			'Almost ready...',
+		];
+		
 		return (
 			<div className="flex items-center justify-center min-h-screen bg-background">
-				<div className="text-center space-y-4">
-					<div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-					<div className="space-y-2">
-						<p className="text-lg font-semibold text-foreground">Loading QueryLab</p>
-						<p className="text-sm text-muted-foreground">Loading database...</p>
+				<div className="text-center space-y-6 max-w-md px-4">
+					<div className="relative w-20 h-20 mx-auto">
+						<div className="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+						<div className="absolute inset-0 flex items-center justify-center">
+							<img 
+								src="/favicon.svg" 
+								alt="QueryLab" 
+								className="w-10 h-10"
+							/>
+						</div>
 					</div>
-					<div className="flex items-center justify-center gap-2 mt-4">
+					<div className="space-y-3">
+						<p className="text-2xl font-bold text-foreground">Welcome to QueryLab</p>
+						<div className="h-8 flex items-center justify-center">
+							<p className="text-base text-muted-foreground transition-opacity duration-500">
+								{messages[loadingMessageIndex]}
+							</p>
+						</div>
+					</div>
+					<div className="flex items-center justify-center gap-2 pt-2">
 						<div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
-						<div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
-						<div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
+						<div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+						<div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
 					</div>
 				</div>
 			</div>
