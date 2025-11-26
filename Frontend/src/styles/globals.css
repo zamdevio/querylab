@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  [data-theme="dark"] {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Monaco Editor dark mode support */
+.monaco-editor {
+  --vscode-editor-background: hsl(var(--background));
+  --vscode-editor-foreground: hsl(var(--foreground));
+}
+
+/* Reduce line numbers width and center them */
+.monaco-editor .margin {
+  width: 28px !important; /* Reduce from default ~50px */
+}
+
+.monaco-editor .line-numbers {
+  width: 28px !important;
+  text-align: center !important;
+}
+
+.monaco-editor .line-numbers .line-number {
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.monaco-editor .current-line ~ .line-numbers {
+  width: 28px !important;
+}
+
+/* Target Monaco's specific line number elements */
+.monaco-editor .margin-view-overlays .line-numbers {
+  width: 28px !important;
+  text-align: center !important;
+}
+
+.monaco-editor .margin-view-overlays .line-numbers .line-number {
+  text-align: center !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+}
+
+[data-theme="dark"] .monaco-editor {
+  --vscode-editor-background: hsl(var(--background));
+  --vscode-editor-foreground: hsl(var(--foreground));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+/* Sonner Toaster theme support - uses system UI colors */
+[data-sonner-toaster] {
+  --toast-bg: hsl(var(--background));
+  --toast-border: hsl(var(--border));
+  --toast-color: hsl(var(--foreground));
+}
+
+[data-sonner-toast] {
+  background: var(--toast-bg) !important;
+  border-color: var(--toast-border) !important;
+  color: var(--toast-color) !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  --toast-border: hsl(var(--primary));
+}
+
+[data-sonner-toast][data-type="error"] {
+  --toast-border: hsl(var(--destructive));
+}
+
+[data-sonner-toast][data-type="info"] {
+  --toast-border: hsl(var(--primary));
+}
+
+/* Editor loading animation - diagonal "/" glow effect */
+.editor-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-loading::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  /* Light mode - more visible blue glow */
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 25%,
+    rgba(59, 130, 246, 0.25) 35%,
+    rgba(59, 130, 246, 0.45) 50%,
+    rgba(59, 130, 246, 0.25) 65%,
+    transparent 75%,
+    transparent 100%
+  );
+  animation: editor-shimmer 2s infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Dark mode - softer glow */
+[data-theme="dark"] .editor-loading::before {
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 25%,
+    rgba(96, 165, 250, 0.2) 35%,
+    rgba(96, 165, 250, 0.35) 50%,
+    rgba(96, 165, 250, 0.2) 65%,
+    transparent 75%,
+    transparent 100%
+  );
+}
+
+@keyframes editor-shimmer {
+  0% {
+    transform: translate(-100%, -100%) rotate(45deg);
+  }
+  100% {
+    transform: translate(100%, 100%) rotate(45deg);
+  }
+}
+
+/* Modal animations */
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-enter {
+  animation: modal-enter 0.2s ease-out;
+}
+
