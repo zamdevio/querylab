@@ -220,7 +220,7 @@ export class LoginService {
 		}
 
 		// Code is correct - mark as verified
-		verification.pending = false as any; // Type hack to remove pending
+		verification.pending = false;
 		const updated = await this.helpers.setSession(
 			`auth:${email}`,
 			verification,

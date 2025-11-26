@@ -21,7 +21,7 @@ export interface PendingVerification {
 	email: string;
 	token: string; // JWT token
 	jti: string; // JWT ID
-	pending: true;
+	pending: boolean;
 	code: string; // 6-digit verification code
 	createdAt: number;
 	attempts: number; // Number of failed verification attempts (max 6)

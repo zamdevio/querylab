@@ -3,24 +3,25 @@
  * Provides easy-to-use functions for accessing storage from workers
  */
 
-import type { StorageResult, StorageValue } from './storage';
+import type { StorageResult } from './storage';
 
 /**
  * Storage client interface
  */
 export interface StorageClient {
-	get<T = unknown>(key: string): Promise<StorageResult<T>>;
-	set<T = unknown>(key: string, value: T, ttlMs?: number): Promise<StorageResult<void>>;
-	delete(key: string): Promise<StorageResult<void>>;
-	has(key: string): Promise<boolean>;
-	getMany<T = unknown>(keys: string[]): Promise<Map<string, T>>;
+	get<T = unknown>(key: string, namespace?: string): Promise<StorageResult<T>>;
+	set<T = unknown>(key: string, value: T, ttlMs?: number, namespace?: string): Promise<StorageResult<void>>;
+	delete(key: string, namespace?: string): Promise<StorageResult<void>>;
+	has(key: string, namespace?: string): Promise<boolean>;
+	getMany<T = unknown>(keys: string[], namespace?: string): Promise<Map<string, T>>;
 	setMany<T = unknown>(
 		entries: Map<string, T>,
 		ttlMs?: number,
+		namespace?: string,
 	): Promise<StorageResult<void>>;
-	deleteMany(keys: string[]): Promise<StorageResult<void>>;
-	listKeys(prefix?: string): Promise<string[]>;
-	clear(): Promise<StorageResult<void>>;
+	deleteMany(keys: string[], namespace?: string): Promise<StorageResult<void>>;
+	listKeys(prefix?: string, namespace?: string): Promise<string[]>;
+	clear(namespace?: string): Promise<StorageResult<void>>;
 }
 
 /**
