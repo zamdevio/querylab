@@ -65,8 +65,14 @@ router.post('/', async (c: Context<{ Bindings: Env }>) => {
 
 		// Set auth token cookie
 		// For cross-origin cookies (different subdomains), we need SameSite=None and Secure=true
+		if (!result.token) {
+			return c.json(
+				errorResponse('Authentication token not generated', 'VERIFICATION_ERROR'),
+				500,
+			);
+		}
 		const prod = isProduction(config);
-		setCookie(c, '_auth.t', result.token!, {
+		setCookie(c, '_auth.t', result.token, {
 			httpOnly: true,
 			secure: prod, // Must be true when SameSite=None (required by browsers)
 			sameSite: prod ? 'None' : 'Lax', // None for cross-origin, Lax for same-origin (dev)

@@ -140,12 +140,10 @@ export function parseAIResponse(response: string): AICodeResponse {
 			const lines = trimmedResponse.split('\n');
 			let sqlStart = false;
 			const sqlLines: string[] = [];
-			let foundExplanation = false;
 
 			for (const line of lines) {
 				// Stop if we hit EXPLANATION marker
 				if (line.match(/^EXPLANATION:/i)) {
-					foundExplanation = true;
 					break;
 				}
 				

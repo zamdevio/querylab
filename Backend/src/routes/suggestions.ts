@@ -91,7 +91,7 @@ router.post('/', async (c: Context<{ Bindings: Env }>): Promise<Response> => {
 		let body: SuggestionsRequest;
 		try {
 			body = await c.req.json<SuggestionsRequest>();
-		} catch (err) {
+		} catch (_err) {
 			return c.json(errorResponse('Invalid JSON in request body', 'INVALID_JSON'), 400);
 		}
 
@@ -175,7 +175,7 @@ router.post('/', async (c: Context<{ Bindings: Env }>): Promise<Response> => {
 			const content = deepseekData.choices[0].message.content.trim();
 			
 			// Remove code blocks if present
-			let cleanContent = content.replace(/```[\s\S]*?```/g, '');
+			const cleanContent = content.replace(/```[\s\S]*?```/g, '');
 			
 			// Split by lines and clean up
 			const lines = cleanContent.split('\n')

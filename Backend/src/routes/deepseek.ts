@@ -114,7 +114,7 @@ router.post('/', async (c: Context<{ Bindings: Env }>): Promise<Response> => {
 		let body: DeepSeekRequest;
 		try {
 			body = await c.req.json<DeepSeekRequest>();
-		} catch (err) {
+		} catch (_err) {
 			return c.json(
 				errorResponse('Invalid JSON in request body', 'INVALID_JSON'),
 				400,

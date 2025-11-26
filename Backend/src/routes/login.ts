@@ -74,9 +74,15 @@ router.post('/', async (c: Context<{ Bindings: Env }>) => {
 		}
 
 		// Send verification email with code
+		if (!result.code) {
+			return c.json(
+				errorResponse('Verification code not generated', 'LOGIN_ERROR'),
+				500,
+			);
+		}
 		const emailResult = await mailer.sendVerificationEmail(
 			body.email.trim().toLowerCase(),
-			result.code!,
+			result.code,
 		);
 
 		if (!emailResult.success) {

@@ -3,9 +3,10 @@
  * Provides centralized auth validation
  */
 
+import type { Context } from 'hono';
 import { createStorageClient, StorageHelpers } from '../do/storageClient';
 import { createJWTService } from './jwt';
-import type { AuthContext, PendingVerification } from './types';
+import type { AuthContext } from './types';
 
 /**
  * Auth service for validating tokens and getting user context
@@ -151,7 +152,7 @@ export function createAuthService(storageNamespace: DurableObjectNamespace, jwtS
 export function createAuthMiddleware(storageNamespace: DurableObjectNamespace, jwtSecret: string) {
 	const authService = createAuthService(storageNamespace, jwtSecret);
 
-	return async (c: any, next: () => Promise<void>) => {
+	return async (c: Context<{ Bindings: Env; Variables: { user: AuthContext } }>, next: () => Promise<void>) => {
 		const user = await authService.getUserFromRequest(c.req.raw);
 		
 		if (!user) {
